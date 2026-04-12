@@ -1,0 +1,5 @@
+love-letter/
+  index.html
+  assets/
+    envelope.png
+    paper.png
