@@ -1,5 +1,330 @@
-love-letter/
-  index.html
-  assets/
-    envelope.png
-    paper.png
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>给你的一封信</title>
+  <style>
+    :root{
+      --bg1:#17161d;
+      --bg2:#0d0d12;
+      --shadow: 0 18px 70px rgba(0,0,0,.45);
+      --ease: cubic-bezier(.2,.8,.2,1);
+
+      /* 信封显示尺寸（手机自适应） */
+      --envW: min(86vw, 360px);
+
+      /* 动画时长 */
+      --flapDur: 760ms;
+      --paperDur: 900ms;
+
+      /* 邮戳位置：从下往上 2/5 => 从上往下 3/5 = 60% */
+      --stampTop: 60%;
+      --stampSize: 22%;
+    }
+
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; margin:0; }
+    body{
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: radial-gradient(1200px 800px at 50% 10%, var(--bg1), var(--bg2));
+      overflow:hidden;
+      color:#fff;
+    }
+
+    /* ============ Cover (信封页) ============ */
+    #cover{
+      position:fixed; inset:0;
+      display:grid; place-items:center;
+      padding: env(safe-area-inset-top) 14px env(safe-area-inset-bottom);
+    }
+
+    .hint{
+      position: fixed;
+      left:0; right:0;
+      bottom: calc(env(safe-area-inset-bottom) + 16px);
+      text-align:center;
+      color: rgba(255,255,255,.65);
+      font-size: 14px;
+      user-select:none;
+      pointer-events:none;
+    }
+
+    .float{
+      animation: float 3.6s ease-in-out infinite;
+      transform-style: preserve-3d;
+    }
+    @keyframes float{
+      0%,100%{ transform: translateY(0); }
+      50%{ transform: translateY(-10px); }
+    }
+
+    .envelope-btn{
+      border:0; background:transparent; padding:0;
+      cursor: default;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .envelope{
+      width: var(--envW);
+      aspect-ratio: 3 / 2;
+      position: relative;
+      transform-style: preserve-3d;
+      perspective: 900px;
+      filter: drop-shadow(var(--shadow));
+    }
+
+    /* 信纸预览：用 paper.png 顶部裁切做“抽出来”的视觉 */
+    .paperPreview{
+      position:absolute;
+      left: 7%;
+      width: 86%;
+      height: 120%;
+      top: 22%;
+      border-radius: 10px;
+      overflow:hidden;
+      transform: translateY(46%) translateZ(1px);
+      transition: transform var(--paperDur) var(--ease), opacity 260ms ease;
+      opacity: 0; /* 初始隐藏 */
+      will-change: transform;
+      background: rgba(255,255,255,.12);
+      box-shadow: 0 10px 30px rgba(0,0,0,.18);
+      pointer-events:none;
+    }
+    .paperPreview img{
+      width:100%;
+      height:100%;
+      object-fit: cover;
+      object-position: top center;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+
+    .base, .flap{
+      position:absolute; inset:0;
+      width:100%; height:100%;
+      display:block;
+      pointer-events:none;
+    }
+    .base img, .flap img{
+      width:100%; height:100%;
+      object-fit: contain;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+
+    /* 翻盖层 */
+    .flap{
+      transform-origin: 50% 6%;
+      transform: rotateX(0deg) translateZ(2px);
+      transition: transform var(--flapDur) var(--ease);
+      will-change: transform;
+    }
+
+    /* 邮戳（可点击） */
+    .stamp{
+      position:absolute;
+      left:50%;
+      top: var(--stampTop);
+      width: var(--stampSize);
+      height: var(--stampSize);
+      transform: translate(-50%,-50%) translateZ(3px);
+      border:0;
+      background: transparent;
+      padding:0;
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: opacity 240ms ease, transform 260ms ease;
+      z-index: 5;
+    }
+    .stamp img{
+      width:100%;
+      height:100%;
+      object-fit: contain;
+      display:block;
+      user-select:none;
+      -webkit-user-drag:none;
+      pointer-events:none;
+    }
+    .stamp.gone{
+      opacity:0;
+      transform: translate(-50%,-50%) scale(0.9) translateZ(3px);
+      pointer-events:none;
+    }
+
+    /* 打开状态 */
+    .opened .flap{
+      transform: rotateX(-165deg) translateZ(2px);
+    }
+    .opened .paperPreview{
+      opacity: 1;
+      transform: translateY(-18%) translateZ(1px);
+    }
+
+    /* ============ Reader (阅读页) ============ */
+    #reader{
+      position: fixed; inset:0;
+      display:none;
+      overflow:hidden;
+      background: rgba(10,10,14,.92);
+    }
+    #reader.show{ display:block; }
+
+    .topbar{
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      padding: calc(env(safe-area-inset-top) + 10px) 12px 10px;
+      display:flex;
+      justify-content: space-between;
+      align-items:center;
+      backdrop-filter: blur(10px);
+      background: linear-gradient(to bottom, rgba(10,10,14,.72), rgba(10,10,14,0));
+    }
+    .btn{
+      border:0;
+      border-radius: 999px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,.14);
+      color: rgba(255,255,255,.92);
+      cursor:pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .scrollArea{
+      position:absolute;
+      inset: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: calc(env(safe-area-inset-top) + 58px) 14px calc(env(safe-area-inset-bottom) + 40px);
+    }
+
+    .paperWrap{ max-width: 720px; margin: 0 auto; }
+    .paperCard{
+      border-radius: 18px;
+      overflow:hidden;
+      box-shadow: var(--shadow);
+      background: #fff7ef;
+    }
+    .paperCard img{
+      width:100%;
+      height:auto;
+      display:block;
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      .float{ animation:none; }
+      .flap, .paperPreview, .stamp{ transition:none; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <section id="cover" aria-label="信封封面">
+    <div class="envelope-btn float" aria-label="信封">
+      <div class="envelope" id="envelope">
+
+        <div class="paperPreview" aria-hidden="true">
+          <img id="paperPreviewImg" alt="" />
+        </div>
+
+        <div class="base">
+          <img id="envBaseImg" alt="信封" />
+        </div>
+
+        <div class="flap">
+          <img id="envFlapImg" alt="" />
+        </div>
+
+        <!-- 邮戳：点它开信 -->
+        <button class="stamp" id="stampBtn" aria-label="撕开邮戳开启信封">
+          <img id="stampImg" alt="邮戳" />
+        </button>
+
+      </div>
+    </div>
+
+    <div class="hint">点一下邮戳</div>
+  </section>
+
+  <section id="reader" aria-label="信纸阅读">
+    <div class="topbar">
+      <button class="btn" id="backBtn">返回</button>
+      <button class="btn" id="toTopBtn">回到顶部</button>
+    </div>
+
+    <div class="scrollArea" id="scrollArea">
+      <div class="paperWrap">
+        <div class="paperCard">
+          <img id="paperImg" alt="信纸内容" />
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // 你的素材路径（按你仓库现有文件名）
+    const ASSETS = {
+      base: "./assets/feng.png",
+      flap: "./assets/gai.png",
+      stamp: "./assets/ko.png",
+      paper: "./assets/生日信.png",
+    };
+
+    const cover = document.getElementById("cover");
+    const reader = document.getElementById("reader");
+    const envelope = document.getElementById("envelope");
+
+    const envBaseImg = document.getElementById("envBaseImg");
+    const envFlapImg = document.getElementById("envFlapImg");
+    const stampImg = document.getElementById("stampImg");
+    const paperPreviewImg = document.getElementById("paperPreviewImg");
+    const paperImg = document.getElementById("paperImg");
+
+    // 绑定图片
+    envBaseImg.src = ASSETS.base;
+    envFlapImg.src = ASSETS.flap;
+    stampImg.src = ASSETS.stamp;
+    paperPreviewImg.src = ASSETS.paper;
+    paperImg.src = ASSETS.paper;
+
+    // 预加载，减少首次点击空白
+    Object.values(ASSETS).forEach(src => {
+      const img = new Image();
+      img.src = src;
+    });
+
+    function openLetter() {
+      envelope.classList.add("opened");
+      const total = 900; // 动画主时长（ms）
+      setTimeout(() => {
+        cover.style.display = "none";
+        reader.classList.add("show");
+        document.getElementById("scrollArea").scrollTo({ top: 0, behavior: "instant" });
+      }, total);
+    }
+
+    function closeLetter() {
+      reader.classList.remove("show");
+      cover.style.display = "grid";
+      envelope.classList.remove("opened");
+      // 把邮戳恢复回来（方便你测试多次）
+      document.getElementById("stampBtn").classList.remove("gone");
+    }
+
+    document.getElementById("stampBtn").addEventListener("click", () => {
+      const btn = document.getElementById("stampBtn");
+      btn.classList.add("gone");  // 邮戳消失
+      openLetter();               // 开信
+    });
+
+    document.getElementById("backBtn").addEventListener("click", closeLetter);
+    document.getElementById("toTopBtn").addEventListener("click", () => {
+      document.getElementById("scrollArea").scrollTo({ top: 0, behavior: "smooth" });
+    });
+  </script>
+</body>
+</html>
