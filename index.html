@@ -10,10 +10,11 @@
       --bg2:#0d0d12;
       --shadow: 0 18px 70px rgba(0,0,0,.45);
       --ease: cubic-bezier(.2,.8,.2,1);
+      --paperFadeDur: 3000ms;
 
       --envW: min(86vw, 360px);
-      --openDur: 520ms;      /* 信封切换+纸淡入时长 */
-      --stampTop: 52%;
+      --openDur: 3000ms;      /* 信封切换+纸淡入时长 */
+      --stampTop: 40%;
       --stampSize: 100%;
     }
 
@@ -266,7 +267,7 @@
 
     function openLetter() {
       envelope.classList.add("opened");
-      const total = 520; // 要和 --openDur 一致
+      const total = 3000; // 要和 --openDur 一致
       setTimeout(() => {
         cover.style.display = "none";
         reader.classList.add("show");
@@ -275,17 +276,21 @@
     }
 
     function closeLetter() {
-      reader.classList.remove("show");
-      cover.style.display = "grid";
-      envelope.classList.remove("opened");
-      document.getElementById("stampBtn").classList.remove("gone");
-    }
+  reader.classList.remove("show");
+  cover.style.display = "grid";
+  envelope.classList.remove("opened");
+  const btn = document.getElementById("stampBtn");
+  btn.classList.remove("gone");
+  btn.disabled = false; // 可选：恢复点击
+}
 
-    document.getElementById("stampBtn").addEventListener("click", () => {
-      const btn = document.getElementById("stampBtn");
-      btn.classList.add("gone");
-      openLetter();
-    });
+   document.getElementById("stampBtn").addEventListener("click", () => {
+  const btn = document.getElementById("stampBtn");
+  btn.classList.add("gone");        // ① 先让邮戳淡出
+
+  btn.disabled = true;             // ② 可选：防止连点
+  setTimeout(() => openLetter(), 150); // ③ 等 150ms 再开信（你可改 100~300）
+});
 
     document.getElementById("backBtn").addEventListener("click", closeLetter);
     document.getElementById("toTopBtn").addEventListener("click", () => {
